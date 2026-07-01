@@ -1,0 +1,278 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: gaussian_server
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import socket; s=socket.create_connection(('localhost',8080),2); s.close()" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      NUM_CLIENTS: "7"
+      NUM_ROUNDS: "40"
+      LR: "1e-4"
+      LOCAL_EPOCHS: "5"
+      CLIPNORM: "0.0"
+      LAMBDA_SAM: "0.05"
+      SEED: "42"
+      MALICIOUS_CIDS: "0,1,2,4,5"
+      GAUSSIAN_NOISE_MEAN: "0.0"
+      GAUSSIAN_NOISE_STD: "1.0"
+      ANOMALY_PCT: "95.0"
+      SCORE_DIR: "/app/outputs/client_scores_conv3DAE_FedAvg_attack_aug_v3_m5"
+      LOG_DIR: "/app/logs"
+      CHECKPOINT_DIR: /app/checkpoints
+      SERVER_PORT: "8080"
+    volumes:
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+      - type: bind
+        source: ./checkpoints
+        target: /app/checkpoints
+    networks:
+      - federated_network
+    restart: "no"
+
+  client-0:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: gaussian_client_0
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_6.npy"
+      CLIENT_ID: "0"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs"
+    volumes:
+      - type: bind
+        source: ../HSI-FedAvg-v2/data/AEZ_6.npy
+        target: /data/AEZ_6.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+
+  client-1:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: gaussian_client_1
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_8.npy"
+      CLIENT_ID: "1"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs"
+    volumes:
+      - type: bind
+        source: ../HSI-FedAvg-v2/data/AEZ_8.npy
+        target: /data/AEZ_8.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+
+  client-2:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: gaussian_client_2
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_9.npy"
+      CLIENT_ID: "2"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs"
+    volumes:
+      - type: bind
+        source: ../HSI-FedAvg-v2/data/AEZ_9.npy
+        target: /data/AEZ_9.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+
+  client-3:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: gaussian_client_3
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_10.npy"
+      CLIENT_ID: "3"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs"
+    volumes:
+      - type: bind
+        source: ../HSI-FedAvg-v2/data/AEZ_10.npy
+        target: /data/AEZ_10.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+
+  client-4:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: gaussian_client_4
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/Split_1_ImageOnly.npy"
+      CLIENT_ID: "4"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs"
+    volumes:
+      - type: bind
+        source: ../HSI-FedAvg-v2/data/Split_1_ImageOnly.npy
+        target: /data/Split_1_ImageOnly.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+
+  client-5:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: gaussian_client_5
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/Split_2_ImageOnly.npy"
+      CLIENT_ID: "5"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs"
+    volumes:
+      - type: bind
+        source: ../HSI-FedAvg-v2/data/Split_2_ImageOnly.npy
+        target: /data/Split_2_ImageOnly.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+
+  client-6:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: gaussian_client_6
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/Split_3_ImageOnly.npy"
+      CLIENT_ID: "6"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs"
+    volumes:
+      - type: bind
+        source: ../HSI-FedAvg-v2/data/Split_3_ImageOnly.npy
+        target: /data/Split_3_ImageOnly.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+
+networks:
+  federated_network:
+    driver: bridge
