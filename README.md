@@ -1,167 +1,129 @@
-# HSI-FedAvg-Gaussian-Noise: Implementation Notes
+# Server-Client Workflow (Gaussian Noise Attack)
 
-This README keeps historical implementation notes and log interpretation context.
+This document explains the end-to-end code flow and file structure in `HSI-FedAvg-Gaussian-Noise` after replacing client-side Sign-Flip with Gaussian Noise attack.
 
-- `HSI-FedAvg-Gaussian-Noise/logs/docker-logs/server_20260425_235537.log`
+## 1) Project Structure and Responsibilities
 
-Current attack flow for this project is Gaussian noise (not Sign-Flip). For the up-to-date execution flow, see `workflow-v1.md`.
+- `server/app.py`
+  - Reads runtime environment variables.
+  - Initializes server logging.
+  - Builds Flower strategy via `make_strategy(...)`.
+  - Starts Flower server and saves final checkpoint.
 
----
+- `shared/server.py`
+  - Defines strategy `FedAvgWithClientMetrics` (extends Flower `FedAvg`).
+  - Builds initial global model parameters from `ConvAE3D`.
+  - Sends fit/evaluate config to clients.
+  - Logs per-client and global update diagnostics.
 
-## What the implementation is doing
+- `client/train.py`
+  - Initializes client logging.
+  - Loads local data and performs train/val split.
+  - Creates `HSIClient` and starts Flower client process.
 
-### 1) Global model initialization (server vs client)
+- `shared/client.py`
+  - Defines `HSIClient` train/evaluate logic.
+  - Converts model params between PyTorch and NumPy.
+  - Applies malicious behavior for selected clients:
+    - Gaussian noise update generation on malicious clients.
 
-- **The global model is initialized on the server** (not from any client).
-- The Flower server log confirms this with: *"Using initial global parameters provided by strategy"*.
+- `shared/model.py`
+  - Defines `ConvAE3D` and `composite_loss`.
 
-Code location:
-- `shared/server.py` → `make_strategy(...)`
-  - Creates `model = ConvAE3D()`
-  - Converts `state_dict()` tensors to numpy arrays
-  - Passes them as Flower `initial_parameters`
+- `shared/data.py`
+  - Data normalization and train/val split helpers.
 
-Implication:
-- The initial global model weights are the server-side PyTorch initialization of `ConvAE3D()`.
+- `docker-compose.yml`
+  - Orchestrates one server and multiple clients.
+  - Provides environment variables for model/attack configuration.
 
----
+## 2) Startup Flow
 
-### 2) Seeding / reproducibility
+1. `server/app.py` reads env vars:
+   - Training: `NUM_CLIENTS`, `NUM_ROUNDS`, `LR`, `LOCAL_EPOCHS`, `CLIPNORM`, `LAMBDA_SAM`
+   - Attack: `MALICIOUS_CIDS`, `GAUSSIAN_NOISE_MEAN`, `GAUSSIAN_NOISE_STD`
+   - Eval/output: `ANOMALY_PCT`, `SCORE_DIR`, `CHECKPOINT_DIR`, `SERVER_PORT`
+2. Server creates strategy using `shared/server.py::make_strategy(...)`.
+3. Strategy initializes server-side global model (`ConvAE3D`) and passes initial parameters to Flower.
+4. Clients start from `client/train.py`, load local data, and connect to server.
 
-Seeding is implemented on **server and clients**.
+## 3) Round-Level Fit Flow (Training + Attack Injection)
 
-#### Server
-- Seed is read from env var `SEED` (default `42`) in `server/app.py`.
-- `shared/server.py` calls `seed_everything(seed)` **before** creating `ConvAE3D()` so initial global weights become deterministic (best effort).
+Per communication round:
 
-#### Clients
-- Seed is read from env var `SEED` (default `42`) in `client/train.py`.
-- Each client uses a **distinct but reproducible** seed: `SEED + CLIENT_ID`.
-- Clients seed:
-  - Python/NumPy/PyTorch RNG (`seed_everything(SEED + cid)`)
-  - DataLoader shuffling by passing a `torch.Generator()` seeded with `SEED + cid`
+1. Strategy sends global parameters + fit config to clients:
+   - `lr`, `local_epochs`, `clipnorm`, `lambda_sam`
+   - `malicious_cids`, `gaussian_noise_mean`, `gaussian_noise_std`
+2. In `HSIClient.fit(...)`:
+   - Client loads global parameters.
+   - Performs local model training for configured epochs.
+   - Computes local `updated_params`.
+3. Malicious behavior in `shared/client.py`:
+   - If `cid in malicious_cids`, client does not send honest local update.
+   - It samples Gaussian noise per parameter tensor:
+     - `noise ~ N(gaussian_noise_mean, gaussian_noise_std)`
+   - Sent parameter becomes:
+     - `sent_param = global_param + noise`
+4. Honest client behavior:
+   - Sends `updated_params` directly.
+5. Client returns:
+   - Parameters to aggregate
+   - Number of local examples
+   - Train and diagnostics metrics (loss, norms, cosine, malicious flag)
 
-Notes:
-- GPU runs can still show nondeterminism depending on hardware/ops, but the code is doing the standard “best effort” steps.
+## 4) Server Aggregation and Diagnostics
 
----
+In `FedAvgWithClientMetrics.aggregate_fit(...)`:
 
-### 3) Data split correctness
+1. Before aggregation:
+   - Computes each client delta (client params - previous global params).
+   - Logs per-client diagnostics to client metrics log.
+2. Aggregates updates with standard Flower FedAvg:
+   - `super().aggregate_fit(...)`
+3. After aggregation:
+   - Stores `_latest_aggregated_parameters`.
+   - Logs global shift norm and direction diagnostics.
 
-Data split is deterministic given a seed.
+## 5) Round-Level Evaluate Flow
 
-Code location:
-- `shared/data.py` → `split_train_val(...)`
-  - Uses `sklearn.model_selection.train_test_split(..., random_state=seed, shuffle=True)`
+1. Server sends evaluate config:
+   - `lambda_sam`, `anomaly_pct`, `save_scores`, `score_dir`, `server_round`
+2. Each client runs `evaluate(...)` on local validation split:
+   - Computes `val_loss`, `val_mse`, `val_sam`
+   - Computes patch-level percentile/anomaly metrics
+   - Optionally saves patch score arrays
+3. Flower aggregates evaluation metrics across clients.
 
-Client usage:
-- `client/train.py` passes `seed=SEED + CLIENT_ID` into the split function.
+## 6) Parameter/Message Format
 
-Implication:
-- Under a fixed run seed, each client gets a repeatable train/val split; different clients can have different (but deterministic) splits.
+- Local model format: PyTorch `state_dict`.
+- Transport-ready local format: list of NumPy arrays.
+- Flower transport: `Parameters` message over gRPC.
 
----
+Conversions:
 
-### 4) FedAvg aggregation correctness
+- Client:
+  - `get_parameters(model)`: state_dict -> NumPy arrays
+  - `set_parameters(model, params)`: NumPy arrays -> state_dict
+- Server:
+  - `ndarrays_to_parameters(...)`
+  - `parameters_to_ndarrays(...)`
 
-Aggregation is **plain Flower FedAvg**.
+## 7) Logging and Checkpoint Flow
 
-Code location:
-- `shared/server.py` defines `FedAvgWithClientMetrics(fl.server.strategy.FedAvg)`
-  - `aggregate_fit(...)` logs diagnostics and then calls:
-    - `super().aggregate_fit(server_round, results, failures)`
+- Server logs:
+  - Main run log (`server_<timestamp>.log`)
+  - Client metrics log (`client_metrics_<timestamp>.log`)
+- Client logs:
+  - One log file per client run (`client_<id>_<timestamp>.log`)
+- Final checkpoint:
+  - Saved once after all rounds complete in `server/app.py`.
+  - Path: `CHECKPOINT_DIR/<run_timestamp>/global_model_final.pt`
+  - Contains run timestamp, number of rounds, and final model `state_dict`.
 
-Implication:
-- Server-side aggregation is standard weighted FedAvg (by `num_examples`).
-- No custom robust aggregation is applied in `aggregate_fit`.
+## 8) Notes for Correct Gaussian Attack Usage
 
----
-
-### 5) Is clipping implemented?
-
-There is **no clipping of updates on the server before aggregation**.
-
-There is **optional client-side gradient clipping** during local training:
-- `shared/client.py`:
-  - `torch.nn.utils.clip_grad_norm_(..., max_norm=clipnorm)` if `clipnorm > 0`
-
-Implication:
-- If `CLIPNORM=0.0`, gradient clipping is disabled.
-- Even if enabled, this is **gradient clipping** during local training, not “update clipping before FedAvg on the server”.
-
----
-
-## Log analysis: `server_20260425_235537.log`
-
-### A) Global init confirmation
-
-The log contains:
-- `[INIT] Using initial global parameters provided by strategy`
-
-This matches the server-initialized global model described above.
-
----
-
-### B) Nature of honest vs malicious clients (sign-flip attack)
-
-The client implementation performs **sign-flip with scaling** for malicious clients:
-- Honest client sends `updated_params`
-- Malicious client sends `global + (-alpha * delta)` where `delta = local - global`
-
-Expected patterns:
-- Malicious: `upd_cos ≈ -1` (sent update opposite direction to honest update)
-- Malicious: `post_norm ≈ alpha * pre_norm` (when alpha > 1)
-- Honest: `upd_cos ≈ +1` and `pre_norm == post_norm`
-
-Observed in the log (examples in Round 1):
-- Malicious clients show:
-  - `malicious=True`, `alpha=1.500`, `upd_cos=-1.000000`
-  - `post_norm` is ~1.5× `pre_norm`
-- Honest clients show:
-  - `malicious=False`, `alpha=0.000`, `upd_cos=1.000000`
-  - `pre_norm == post_norm`
-
-Conclusion:
-- The log matches the intended sign-flip attack behavior.
-
----
-
-### C) Do the global updates track malicious direction?
-
-The server logs `global_shift` direction cosines:
-- `cos_to_mal` is consistently **positive and large**
-- `cos_to_honest` becomes **negative** in later rounds
-
-Interpretation:
-- The global update is being pulled toward the malicious average update direction,
-  which is a typical outcome when enough malicious clients participate with sign-flip scaling.
-
----
-
-### D) Do evaluation metrics degrade under attack?
-
-The summary history shows steadily increasing values:
-- **Distributed loss** increases each round (≈ 0.95 → ≈ 10.14 by round 10)
-- **`val_mse`** increases (≈ 0.86 → ≈ 10.01 by round 10)
-- **`val_sam`** increases (≈ 1.82 → ≈ 2.59 by round 10)
-
-Interpretation:
-- This is consistent with a poisoning attack that destabilizes learning and harms reconstruction performance.
-
----
-
-### E) How many malicious clients?
-
-The aggregated fit metric `is_malicious` is ~0.53, which suggests **~4 out of 7** clients are malicious (exact average can shift due to weighting by `num_examples`).
-
----
-
-## Summary
-
-- **Global init**: server-provided initial parameters (correct).
-- **Seeding**: implemented server + clients; clients use `SEED + CLIENT_ID`.
-- **Data split**: deterministic with `train_test_split(..., random_state=seed)`.
-- **FedAvg**: plain Flower FedAvg (no robust aggregation).
-- **Clipping**: only optional client gradient clipping; no server-side update clipping.
-- **Log patterns**: match sign-flip attack; malicious updates are direction-inverted and scaled; global updates align more with malicious direction; evaluation metrics degrade over rounds.
-
+- Attack is controlled centrally by server fit config and applied only in `shared/client.py`.
+- `MALICIOUS_CIDS` selects which clients are malicious.
+- `GAUSSIAN_NOISE_MEAN` and `GAUSSIAN_NOISE_STD` control noise distribution.
+- FedAvg aggregation and checkpoint logic remain unchanged.
