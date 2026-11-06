@@ -7,3 +7,16 @@
 - **AUROC Analysis:** Compares the crop-anomaly detection using `MSE-based AUROC` and `SAM-based AUROC`.
 - Code Repository is maintained in three separate branches for each different strategies: `fedavg-sign-flip`, `fedavg-gaussian-noise`, `RFA`.
 
+## Evaluation Results
+
+### 1. Sign-Flip Attack (Reconstruction Metrics)
+![Sign-Flip-Attack-Main](images/sign-flip-main.png)
+
+### 2. Sign-Flip Attack (Sensitivity Analysis)
+![Sign-Flip-Attack-Sensitivity](images/sign-flip-sensitivity.png)
+
+### 3. Gaussian Noise Amplification Attack (Reconstruction Metrics)
+![Gaussina-Noise-Amplificaiton-Attack-Main](images/gaussian-noise-amp-main.png)
+
+### 4. Gaussian Noise Amplification Attack (Sensitivity Analysis)
+![Gaussina-Noise-Amplificaiton-Attack-Sensitivity](images/gaussina-noise-amp-sensitivity.png)
