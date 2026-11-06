@@ -1,0 +1,46 @@
+{
+  "patch MSE": {
+    "All anomalous patches": {
+      "auroc": 0.4459277494454089,
+      "normal_patches": 1152,
+      "anomalous_patches": 1152
+    },
+    "Spectral spike": {
+      "auroc": 0.48804502133969907,
+      "normal_patches": 1152,
+      "anomalous_patches": 384
+    },
+    "Spectral substitution": {
+      "auroc": 0.3817737720630787,
+      "normal_patches": 1152,
+      "anomalous_patches": 384
+    },
+    "Band absorption": {
+      "auroc": 0.46796445493344907,
+      "normal_patches": 1152,
+      "anomalous_patches": 384
+    }
+  },
+  "patch spectral angle": {
+    "All anomalous patches": {
+      "auroc": 0.4942280333719136,
+      "normal_patches": 1152,
+      "anomalous_patches": 1152
+    },
+    "Spectral spike": {
+      "auroc": 0.5283983018663194,
+      "normal_patches": 1152,
+      "anomalous_patches": 384
+    },
+    "Spectral substitution": {
+      "auroc": 0.46461882414641203,
+      "normal_patches": 1152,
+      "anomalous_patches": 384
+    },
+    "Band absorption": {
+      "auroc": 0.48966697410300924,
+      "normal_patches": 1152,
+      "anomalous_patches": 384
+    }
+  }
+}

@@ -1,0 +1,297 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import socket; s=socket.create_connection(('localhost',8080),2); s.close()" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      NUM_CLIENTS: "7"
+      NUM_ROUNDS: "40"
+      LR: "1e-4"
+      LOCAL_EPOCHS: "5"
+      CLIPNORM: "0.0"
+      LAMBDA_SAM: "0.05"
+      SEED: "42"
+
+      # attack parameters
+      ATTACK_MODE: "signflip" # none, signflip, gaussian_noise
+      ATTACK_SEED: "42"
+      MALICIOUS_CIDS: "0, 2, 5, 6" #"0,2,5,6"
+      SIGN_FLIP_ALPHA: "1.5"
+      GAUSSIAN_NOISE_MEAN: "0.0"
+      GAUSSIAN_NOISE_STD: "0.2"
+
+      # Server-side defense configuration
+      AGGREGATION_METHOD: "rfa"              # fedavg, rfa
+      SERVER_CLIPPING_METHOD: "fixed"           # none, fixed, adaptive
+      SERVER_FIXED_CLIP_NORM: "5.0"
+      SCORE_DIR: "/app/outputs/4_mal_sf_1.5_fixed_5.0_rfa"
+      SERVER_ADAPTIVE_CLIP_MULTIPLIER: "1.0"
+      RFA_MAX_ITER: "100"
+      RFA_TOL: "1e-6"
+
+      # DP noise layer
+      DP_MODE: "clipped"                 # none, standalone, clipped
+      DP_NOISE_STD: "0.001"                 # used only when DP_MODE=standalone
+      DP_NOISE_MULTIPLIER: "0.001"            # used only when DP_MODE=clipped
+      DP_SEED: "42"
+
+      ANOMALY_PCT: "95.0"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+      CHECKPOINT_DIR: /app/checkpoints
+      SERVER_PORT: "8080"
+    volumes:
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+      - type: bind
+        source: ./checkpoints
+        target: /app/checkpoints
+    networks:
+      - federated_network
+    restart: "no"
+
+  client-0:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_6.npy"
+      CLIENT_ID: "0"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+    volumes:
+      - type: bind
+        source: ./data/AEZ_6.npy
+        target: /data/AEZ_6.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+    gpus: all
+
+  client-1:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_8.npy"
+      CLIENT_ID: "1"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+    volumes:
+      - type: bind
+        source: ./data/AEZ_8.npy
+        target: /data/AEZ_8.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+    gpus: all
+
+  client-2:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_9.npy"
+      CLIENT_ID: "2"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+    volumes:
+      - type: bind
+        source: ./data/AEZ_9.npy
+        target: /data/AEZ_9.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+    gpus: all
+
+  client-3:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/AEZ_10.npy"
+      CLIENT_ID: "3"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+    volumes:
+      - type: bind
+        source: ./data/AEZ_10.npy
+        target: /data/AEZ_10.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+    gpus: all
+
+  client-4:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/Split_1_ImageOnly.npy"
+      CLIENT_ID: "4"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+    volumes:
+      - type: bind
+        source: ./data/Split_1_ImageOnly.npy
+        target: /data/Split_1_ImageOnly.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+    gpus: all
+
+  client-5:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/Split_2_ImageOnly.npy"
+      CLIENT_ID: "5"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+    volumes:
+      - type: bind
+        source: ./data/Split_2_ImageOnly.npy
+        target: /data/Split_2_ImageOnly.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+    gpus: all
+
+  client-6:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATA_FILE: "/data/Split_3_ImageOnly.npy"
+      CLIENT_ID: "6"
+      SERVER_ADDRESS: "server:8080"
+      BATCH_SIZE: "4"
+      VAL_RATIO: "0.15"
+      SEED: "42"
+      MAX_RETRIES: "15"
+      RETRY_DELAY: "5"
+      LOG_DIR: "/app/logs/4_mal_sf_1.5_fixed_5.0_rfa"
+    volumes:
+      - type: bind
+        source: ./data/Split_3_ImageOnly.npy
+        target: /data/Split_3_ImageOnly.npy
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /app/outputs
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    networks:
+      - federated_network
+    restart: on-failure
+    gpus: all
+
+networks:
+  federated_network:
+    driver: bridge

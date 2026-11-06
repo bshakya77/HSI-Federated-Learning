@@ -1,0 +1,33 @@
+{
+  "mse": {
+    "auroc": 0.498437198591821,
+    "normal_median": 0.026352129876613617,
+    "anomaly_median": 0.02584986388683319,
+    "normal_p95": 0.08023270219564438,
+    "anomaly_p95": 0.08011633157730103
+  },
+  "sam": {
+    "auroc": 0.49300733024691357,
+    "normal_median": 0.5839177370071411,
+    "anomaly_median": 0.5776827335357666,
+    "normal_p95": 0.9690696597099304,
+    "anomaly_p95": 1.0067358016967773
+  },
+  "by_scenario": {
+    "spectral_spike": {
+      "mse_auroc": 0.4596286349826389,
+      "sam_auroc": 0.45383481626157407,
+      "patches": 1536
+    },
+    "spectral_substitution": {
+      "mse_auroc": 0.5231662326388888,
+      "sam_auroc": 0.5185592086226852,
+      "patches": 1536
+    },
+    "band_absorption": {
+      "mse_auroc": 0.5125167281539352,
+      "sam_auroc": 0.5066279658564815,
+      "patches": 1536
+    }
+  }
+}
