@@ -14,15 +14,15 @@
 ### Sign-Flip Attack Architecture
 <img src="images/sign_flip_attack_architecture.png"
      alt="Sign-Flip Attack Architecture"
-     width="1024"
-     height="1024">
+     width="720"
+     height="720">
 
 ### Gaussian-Noise Amplification Attack Architecture
 
 <img src="images/gaussian_noise_attack_architecture.png"
      alt="Gaussian-Noise Amplification Attack Architecture"
-     width="1024"
-     height="1024">
+     width="720"
+     height="720">
 
 ## Evaluation Results
 
